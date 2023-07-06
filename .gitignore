@@ -1,2 +1,9 @@
-./yolov5/runs/
-./SegFormer/work_dirs/
+./yolov5/*.pt
+./yolov5/runs/*
+./SegFormer/pretrained/*
+./SegFormer/work_dirs/*
+./SegFormer/mmsegmentation.egg-info/*
+./view/
+./tmp_results/
+*.docx
+debug.py
