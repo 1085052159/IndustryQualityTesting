@@ -1,0 +1,16 @@
+# Train command: python train.py --data bolt.yaml
+# Default dataset location is next to YOLOv5:
+#   /parent
+#     /datasets/bolt
+
+
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: /media/ubuntu/dataset_nvme/dataset/bolt_piezometer/piezometer_panel  # dataset root dir
+train: images/train  # train images (relative to 'path')
+val: images/train  # val images (relative to 'path')
+test:  # test images (optional)
+
+# Classes
+nc: 21  # number of classes
+names: [ '0', '0.1', '0.2', '0.3', '0.4', '0.5', '0.6', '0.8', '1', '1.2', '1.6',
+         '10', '20', '30', '40', '50', '60', '80', '-20', '-40', 'panel_center' ]  # class names
