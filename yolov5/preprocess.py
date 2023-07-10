@@ -6,22 +6,17 @@ import cv2
 from tqdm import tqdm
 
 
-def json2txt(json_label_root):
-    json_labels = glob("%s/*.json" % json_label_root)
-    for label_path in tqdm(json_labels):
-        label_path = label_path.replace("\\", "/")
-        label_txt_path = "%s.txt" % (label_path.split(".")[0].replace("/labels_json/", "/labels/"))
-        label_txt_root = os.path.dirname(label_txt_path)
-        os.makedirs(label_txt_root, exist_ok=True)
-        with open(label_path, "r") as f:
+def labelbee_json2txt(json_label_root):
+    def resolve_labelbee_json(labelbee_json_path):
+        with open(labelbee_json_path, "r") as f:
             data = json.load(f)
         img_width = int(data["width"])
         img_height = int(data["height"])
         results = data["step_1"]["result"]
-        lines = []
+        bboxes = []
         for result in results:
-            attribute = result["attribute"]
-            if len(attribute) == 0:
+            cls_id = result["attribute"]
+            if len(cls_id) == 0:
                 continue
             x = float(result["x"])
             y = float(result["y"])
@@ -29,10 +24,62 @@ def json2txt(json_label_root):
             height = float(result["height"])
             cx = x + width / 2
             cy = y + height / 2
-            line = "%s %s %s %s %s" % (attribute, cx / img_width, cy / img_height, width / img_width, height / img_height)
-            lines.append(line)
+            norm_cx = cx / img_width
+            norm_cy = cy / img_height
+            norm_w = width / img_width
+            norm_h = height / img_height
+            # bboxes.append([cls_id, norm_cx, norm_cy, norm_w, norm_h])
+            bboxes.append([str(cls_id), str(norm_cx), str(norm_cy), str(norm_w), str(norm_h)])
+        return bboxes
+
+    json_labels = glob("%s/*.json" % json_label_root)
+    for label_path in tqdm(json_labels):
+        label_path = label_path.replace("\\", "/")
+        label_txt_path = "%s.txt" % (label_path.split(".")[0].replace("/labels_json/", "/labels/"))
+        label_txt_root = os.path.dirname(label_txt_path)
+        os.makedirs(label_txt_root, exist_ok=True)
+        bboxes = resolve_labelbee_json(label_path)
         with open(label_txt_path, "w") as f:
-            f.write("\n".join(lines))
+            f.write("\n".join([" ".join(bbox) for bbox in bboxes]))
+
+
+def labelme_json2txt(json_label_root):
+    def resolve_labelme_json(labelme_json_path):
+        with open(labelme_json_path, "r") as f:
+            data = json.load(f)
+        img_width = int(data["imageWidth"])
+        img_height = int(data["imageHeight"])
+        shapes = data["shapes"]
+        bboxes = []
+        for shape in shapes:
+            label = shape["label"]
+            cls_id = shape["group_id"]
+            if cls_id is None:
+                cls_id = LABEL_MAP[label.lower()]
+            points = shape["points"]
+            x1, y1 = [float(t) for t in points[0]]
+            x2, y2 = [float(t) for t in points[1]]
+            cx = (x1 + x2) / 2
+            cy = (y1 + y2) / 2
+            w = x2 - x1
+            h = y2 - y1
+            norm_cx = cx / img_width
+            norm_cy = cy / img_height
+            norm_w = w / img_width
+            norm_h = h / img_height
+            # bboxes.append([cls_id, norm_cx, norm_cy, norm_w, norm_h])
+            bboxes.append([str(cls_id), str(norm_cx), str(norm_cy), str(norm_w), str(norm_h)])
+        return bboxes
+
+    json_labels = glob("%s/*.json" % json_label_root)
+    for label_path in tqdm(json_labels):
+        label_path = label_path.replace("\\", "/")
+        label_txt_path = "%s.txt" % (label_path.split(".")[0].replace("/labels_json/", "/labels/"))
+        label_txt_root = os.path.dirname(label_txt_path)
+        os.makedirs(label_txt_root, exist_ok=True)
+        bboxes = resolve_labelme_json(label_path)
+        with open(label_txt_path, "w") as f:
+            f.write("\n".join([" ".join(bbox) for bbox in bboxes]))
 
 
 def verify(json_label_root):
@@ -73,16 +120,17 @@ def resize_imgs(img_root, img_save_root, new_height=320):
         img_save_path = "%s/%s" % (img_save_root, os.path.basename(img_path))
         cv2.imwrite(img_save_path, new_img)
 
-# json_label_root = "F:/dataset/bolt_piezometer/bolt/labels_json/train"
-# json_label_root = "F:/dataset/bolt_piezometer/piezometer/labels_json/train"
-# json_label_root = "F:/dataset/bolt_piezometer/piezometer_multi_cls/labels_json/train"
-# json_label_root = "F:/dataset/bolt_piezometer/piezometer_panel/labels_json/train"
-json_label_root = "F:/dataset/bolt_piezometer/oil_level/labels_json/train"
-json2txt(json_label_root)
-verify(json_label_root)
-# img_root = "F:/dataset/bolt_piezometer/bolt/images/train"
-# img_root = "F:/dataset/bolt_piezometer/piezometer/images/train"
-# img_save_root = "F:/dataset/bolt_piezometer/piezometer_multi_cls/images/train"
-img_root = "F:/dataset/bolt_piezometer/oil_level/images/train_ori"
-img_save_root = "F:/dataset/bolt_piezometer/oil_level/images/train"
-resize_imgs(img_root, img_save_root, new_height=640)
+# # json_label_root = "F:/dataset/bolt_piezometer/bolt/labels_json/train"
+# # json_label_root = "F:/dataset/bolt_piezometer/piezometer/labels_json/train"
+# # json_label_root = "F:/dataset/bolt_piezometer/piezometer_multi_cls/labels_json/train"
+# # json_label_root = "F:/dataset/bolt_piezometer/piezometer_panel/labels_json/train"
+# json_label_root = "F:/dataset/bolt_piezometer/oil_level/labels_json/train"
+# labelbee_json2txt(json_label_root)
+# labelme_json2txt(json_label_root)
+# verify(json_label_root)
+# # img_root = "F:/dataset/bolt_piezometer/bolt/images/train"
+# # img_root = "F:/dataset/bolt_piezometer/piezometer/images/train"
+# # img_save_root = "F:/dataset/bolt_piezometer/piezometer_multi_cls/images/train"
+# img_root = "F:/dataset/bolt_piezometer/oil_level/images/train_ori"
+# img_save_root = "F:/dataset/bolt_piezometer/oil_level/images/train"
+# resize_imgs(img_root, img_save_root, new_height=640)

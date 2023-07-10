@@ -38,7 +38,7 @@ def read_imgs(img_names):
                     img_names = f.readlines()
             else:
                 img_names = [img_names]
-    
+
     imgs = []
     new_img_names = []
     for img_name in img_names:
@@ -146,35 +146,35 @@ def run_detector(model,  # model.pt path(s)
     results["input_imgs"] = source
     # each element is an one image results, [[norm_cx, norm_cy, norm_w, norm_h, cls]]
     results["preds"] = []
-    
+
     # Load model
     stride = int(model.stride.max())  # model stride
     imgsz = check_img_size(imgsz, s=stride)  # check image size
     names = model.module.names if hasattr(model, 'module') else model.names  # get class names
     results["names"] = names
-    
+
     device = select_device(device)
     half &= device.type != 'cpu'  # half precision only supported on CUDA
     if half:
         model.half()  # to FP16
-    
+
     # Run inference
     if device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
-    
+
     imgs_numpy = preprocess_imgs(source, imgsz, stride)
     img = torch.from_numpy(imgs_numpy).to(device)
     img = img.half() if half else img.float()  # uint8 to fp16/32
     img /= 255.0  # 0 - 255 to 0.0 - 1.0
-    
+
     # Inference
     preds = model(img,
                   augment=augment,
                   visualize=False)[0]
-    
+
     # Apply NMS
     preds = non_max_suppression(preds, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-    
+
     # preds: list, each element is [n, 6], cls, xywh, conf
     for j, pred in enumerate(preds):
         im0 = source[j]
@@ -184,11 +184,11 @@ def run_detector(model,  # model.pt path(s)
             pred[:, :4] = scale_coords(img.shape[2:], pred[:, :4], im0.shape).round()
             gn = np.array(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             pred = pred.cpu().numpy()
-            
+
             xywh = xyxy2xywh(pred[:, :4] / gn)
-            
-            res[:, 0] = pred[:, -1] # cls
-            res[:, -1] = pred[:, -2] # conf
+
+            res[:, 0] = pred[:, -1]  # cls
+            res[:, -1] = pred[:, -2]  # conf
             res[:, 1: 5] = xywh
         results["preds"].append(res)
     return results
@@ -215,13 +215,13 @@ def main():
     ##########################################
     model_det = init_model_detector(ckpt_det, device)
     preds = run_detector(model_det,  # model.pt path(s)
-                                    source=source,  # file/dir/URL/glob, 0 for webcam
-                                    imgsz=640,  # inference size (pixels)
-                                    conf_thres=0.25,  # confidence threshold
-                                    iou_thres=0.45,  # NMS IOU threshold
-                                    max_det=1000,  # maximum detections per image
-                                    device=device,  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-                                    )
+                         source=source,  # file/dir/URL/glob, 0 for webcam
+                         imgsz=640,  # inference size (pixels)
+                         conf_thres=0.25,  # confidence threshold
+                         iou_thres=0.45,  # NMS IOU threshold
+                         max_det=1000,  # maximum detections per image
+                         device=device,  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+                         )
     save_img_names = ["%s/%s" % (save_path, os.path.basename(img_name)) for img_name in img_names]
     os.makedirs(save_path, exist_ok=True)
     vis_det_results(preds, save_img_names, line_thickness=3)

@@ -746,7 +746,7 @@ def recog_img_reading(abso_img_paths, save_path, kernel_size=1, device="cuda", s
 
 def main():
     img_root = "./test_imgs/piezometer"
-    abso_img_paths = sorted(glob("%s/*.JPG" % img_root))
+    abso_img_paths = sorted(glob("%s/*" % img_root))
     save_path = "tmp_results/piezometer_reading"
     kernel_size = 1
     device = "cuda"

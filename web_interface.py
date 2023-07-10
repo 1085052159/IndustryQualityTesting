@@ -57,7 +57,7 @@ def bolt_loosen():
     if "错误" in error_warn_info:
         res_dict["results"] = []
     else:
-        abso_img_paths = sorted(glob("%s/*.*" % img_root))
+        abso_img_paths = sorted(glob("%s/*" % img_root))
         results = recog_img_bolt_state(abso_img_paths, save_path,
                                        thresh_angle, thresh_dist,
                                        device, show_temp)
@@ -102,7 +102,7 @@ def piezometer_reading():
     if "错误" in error_warn_info:
         res_dict["results"] = []
     else:
-        abso_img_paths = sorted(glob("%s/*.JPG" % img_root))
+        abso_img_paths = sorted(glob("%s/*" % img_root))
         results = recog_img_reading(abso_img_paths, save_path, kernel_size, device, show_temp)
         res_dict["results"] = results
     
@@ -141,7 +141,7 @@ def oil_level_reading():
     if "错误" in error_warn_info:
         res_dict["results"] = []
     else:
-        abso_img_paths = sorted(glob("%s/*.JPG" % img_root))
+        abso_img_paths = sorted(glob("%s/*" % img_root))
         results = recog_img_oil_level_reading(abso_img_paths, save_path, device, show_temp)
         res_dict["results"] = results
 
