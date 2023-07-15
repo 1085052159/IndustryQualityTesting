@@ -1,7 +1,7 @@
 import sys
 import os
 
-from main_oil_level import recog_img_oil_level_reading
+from main_oil_level import recog_img_oil_level
 
 sys.path.append(os.getcwd() + "/yolov5")
 sys.path.append(os.getcwd() + "/SegFormer")
@@ -142,7 +142,7 @@ def oil_level_reading():
         res_dict["results"] = []
     else:
         abso_img_paths = sorted(glob("%s/*" % img_root))
-        results = recog_img_oil_level_reading(abso_img_paths, save_path, device, show_temp)
+        results = recog_img_oil_level(abso_img_paths, save_path, device, show_temp)
         res_dict["results"] = results
 
     response = make_response(jsonify(res_dict))
@@ -159,9 +159,9 @@ if __name__ == '__main__':
     export FLASK_ENV=development
     flask run --host 0.0.0.0
     2. 客户端接口调用
-    表计读数api调用: curl -X POST http://localhost:5000/api/piezometer_reading -d '{"img_root": "/media/ubuntu/win_software/PycharmWorkspaces/BoltPiezometer/test_imgs/piezometer1", "save_path": "/media/ubuntu/win_software/PycharmWorkspaces/BoltPiezometer/tmp_save/piezometer1", "kernel_size": 1, "device": "cuda", "show_temp": 1}' -H 'Content-Type:application/json'
-    螺丝松动api调用: curl -X POST http://localhost:5000/api/bolt_loosen -d '{"img_root": "/media/ubuntu/win_software/PycharmWorkspaces/BoltPiezometer/test_imgs/bolt1", "save_path": "/media/ubuntu/win_software/PycharmWorkspaces/BoltPiezometer/tmp_save/bolt1", "thresh_angle": 5, "thresh_dist": 5, "device": "cuda", "show_temp": 0}' -H 'Content-Type:application/json'
-    油液读数api调用: curl -X POST http://localhost:5000/api/bolt_loosen -d '{"img_root": "/media/ubuntu/win_software/PycharmWorkspaces/BoltPiezometer/test_imgs/bolt1", "save_path": "/media/ubuntu/win_software/PycharmWorkspaces/BoltPiezometer/tmp_save/bolt1", "thresh_angle": 5, "thresh_dist": 5, "device": "cuda", "show_temp": 0}' -H 'Content-Type:application/json'
+    螺丝松动api调用: curl -X POST http://10.10.3.99:9999/api/bolt_loosen -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/bolt1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/bolt1\", \"thresh_angle\": 5, \"thresh_dist\": 5, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
+    表计读数api调用: curl -X POST http://10.10.3.99:9999/api/piezometer_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/piezometer1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/piezometer1\", \"kernel_size\": 1, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
+    油液读数api调用: curl -X POST http://10.10.3.99:9999/api/oil_level_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/oil_level1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/oil_level1\", \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
     0: False, 1: True
     """
     app.run(debug=True, host="0.0.0.0", post=5000)

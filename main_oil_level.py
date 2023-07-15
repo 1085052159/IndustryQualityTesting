@@ -9,7 +9,7 @@
 import sys
 import os
 
-sys.path.append(os.path.dirname(__file__) + "/yolov5")
+sys.path.append(os.getcwd() + "/yolov5")
 import numpy as np
 import shutil
 import time
@@ -17,6 +17,7 @@ import cv2
 
 from tqdm import tqdm
 from glob import glob
+from PIL import ImageFont, ImageDraw, Image
 
 from yolov5.detect_infer import init_model_detector, run_detector, vis_det_results
 
@@ -75,11 +76,18 @@ def norm2image_level(norm_bbox, height, width):
     return [int(x) for x in bbox]
 
 
+def find_max_idx(pred):
+    max_conf = pred[0][-1]
+    max_idx = 0
+    for i in range(1, len(pred)):
+        if pred[i][-1] >= max_conf:
+            max_conf = pred[i][-1]
+            max_idx = i
+    return max_idx
+
+
 def oil_level_post_process(preds, img):
     """
-    1. 使用训练图预测，得到预测的归一化bbox
-    2. 在原图上crop
-    3. 裁剪后的图，resize到新尺寸：pred_norm_h/w * ori_h/ori_w * ratio
     :param preds: [[numpy_arr1, ...], [numpy_arr1, numpy_arr2, ...]]
     :param img_names: [str1, str2]
     :param save_path:
@@ -92,29 +100,31 @@ def oil_level_post_process(preds, img):
     norm_bboxes, bboxes = [], []
     height, width, _ = img.shape
 
-    oil_tubes = preds[np.where(preds[:, 0] == 0)[0], :]
-    oil_levels = preds[np.where(preds[:, 0] == 1)[0], :]
+    high = preds[np.where(preds[:, 0] == 0)[0], :]  # 高液位阈值
+    level = preds[np.where(preds[:, 0] == 1)[0], :]  # 油液
+    low = preds[np.where(preds[:, 0] == 2)[0], :]  # 低液位阈值
 
     """
-    当同一个类别出现多次时，仅最接近的两个矩形框。
-    可能面临预测不准时，只选择两个中心点最近的框，但此时并不是最优结果
+    同一个位置会预测多个类别，但是错误类别的置信度低于正确类别
     """
-    matched_tube_idx, matched_level_idx, min_cent_dist = -1, -1, 10
-    for i in range(len(oil_tubes)):
-        tube = oil_tubes[i]
-        for j in range(len(oil_levels)):
-            level = oil_levels[j]
-            dist = abs((tube[1] - level[1])) + abs((tube[2] - level[2]))
-            if dist < min_cent_dist:
-                min_cent_dist = dist
-                matched_tube_idx = i
-                matched_level_idx = j
-    if len(oil_tubes) == 0 or len(oil_levels) == 0:
-        return [], []
-    preds = [
-        oil_tubes[matched_tube_idx],
-        oil_levels[matched_level_idx]
-    ]
+    if len(high) > 1:
+        max_idx = find_max_idx(high)
+        high = [high[max_idx]]
+    if len(level) > 1:
+        max_idx = find_max_idx(level)
+        level = [level[max_idx]]
+    if len(low) > 1:
+        max_idx = find_max_idx(low)
+        low = [low[max_idx]]
+    # import pdb
+    # pdb.set_trace()
+    preds = []
+    if len(high) > 0:
+        preds.append(high[0])
+    if len(level) > 0:
+        preds.append(level[0])
+    if len(low) > 0:
+        preds.append(low[0])
 
     for idx, pred in enumerate(preds):
         cls_id, cx, cy, w, h, _ = pred
@@ -125,10 +135,49 @@ def oil_level_post_process(preds, img):
     return norm_bboxes, bboxes
 
 
-def recog_one_img_oil_level_reading(source_ori,
-                                    model_det_oil_level,
-                                    save_path="tmp_results/oil_level",
-                                    show_temp=False, device="cuda:0"):
+def get_oil_level_state(bboxes, thresh_high=5, thresh_low=5):
+    """
+    :param bboxes: list, each element is [cls_id, x1, y1, x2, y2, conf], not normalized
+    :param thresh_high: 高位阈值，当超过该阈值，则认为高位预警状态
+    :param thresh_low: 低位阈值，当超过该阈值，则认为低位预警状态
+    :return:
+        0: "正常",
+        1: "超过高位阈值",
+        2: "低于低位阈值",
+        3: "其它",
+    """
+    # import pdb
+    # pdb.set_trace()
+    high_cy, level_cy, low_cy = 0, 0, 0
+
+    for bbox in bboxes:
+        bbox = [float(x) for x in bbox]
+        if bbox[0] == 0:
+            high_cy = bbox[2] + (bbox[4] - bbox[2]) / 2
+        if bbox[0] == 1:
+            level_cy = bbox[2] + (bbox[4] - bbox[2]) / 2
+        if bbox[0] == 2:
+            low_cy = bbox[2] + (bbox[4] - bbox[2]) / 2
+    if level_cy == 0 or (high_cy == 0 and low_cy == 0):
+        return 3
+    dist_high_low = low_cy - high_cy
+    dist_high = level_cy - high_cy
+    dist_low = level_cy - low_cy
+    dist_thresh_high = dist_high_low * thresh_high / 100
+    dist_thresh_low = dist_high_low * thresh_low / 100
+    if dist_high <= dist_thresh_high:
+        return 1
+    if dist_low >= dist_thresh_low:
+        return 2
+    if dist_high > dist_thresh_high and dist_low < dist_thresh_low:
+        return 0
+    return 3
+
+
+def recog_one_img_oil_level(source_ori,
+                            model_det_oil_level,
+                            save_path="tmp_results/oil_level",
+                            show_temp=False, device="cuda:0"):
     """
     :param source_ori: 输入图片的绝对路径
     :param model_det_oil_level: 油液检测模型
@@ -146,22 +195,33 @@ def recog_one_img_oil_level_reading(source_ori,
         "output_info": {
             "norm_bbox": [[cls_id, norm_cx, norm_cy, norm_w, norm_h, conf],
                           [cls_id, norm_cx, norm_cy, norm_w, norm_h, conf], ...]
-                         油管/油液在图像中的相对位置，二维列表，每个元素是一个长度为6的列表，依次表示:
+                         高阈值/液面/低阈值在图像中的相对位置，二维列表，每个元素是一个长度为6的列表，依次表示:
                          类别id, 归一化后矩形框中心点x坐标, 归一化后矩形框中心点y坐标, 归一化后矩形框宽, 归一化后矩形框高, 置信度
                          类别id=0时, 油管; 类别id=1时, 油液
             "bbox": [[cls_id, cx, cy, w, h, conf],
                      [cls_id, cx, cy, w, h, conf], ...]
-                    油管/油液在图像中的绝对位置，二维列表，每个元素是一个长度为6的列表，依次表示:
+                    高阈值/液面/低阈值在图像中的绝对位置，二维列表，每个元素是一个长度为6的列表，依次表示:
                     类别id, 矩形框中心点x坐标, 矩形框中心点y坐标, 矩形框宽, 矩形框高, 置信度
                     类别id=0时, 油管; 类别id=1时, 油液
-            "level": [油液1占比, 油液2占比, ...]，
-                     油液占比识别结果，一维列表，每个元素表示油液占比结果，读数结果为浮点数
+            "state": [油液状态]，
+                     油液识别结果，一维列表，每个元素表示油液状态，有4种不同状态，分别是0-3
+            "state_desc": {
+                "0": "正常",
+                "1": "超过高位阈值",
+                "2": "低于低位阈值",
+                "3": "其它",
+            }
         }
     }
     """
     oil_level_result = {}
     oil_level_result["input_info"] = {}
     oil_level_result["output_info"] = {}
+
+    oil_level_result["output_info"]["state_desc"] = {}
+    state_list = ["正常", "超过高位阈值", "低于低位阈值", "其它"]
+    for i in range(len(state_list)):
+        oil_level_result["output_info"]["state_desc"][str(i)] = state_list[i]
 
     img0, filename = read_img(source_ori)
     ori_h, ori_w, _ = img0.shape
@@ -197,7 +257,7 @@ def recog_one_img_oil_level_reading(source_ori,
         save_names = ["%s/%s.png" % (oil_level_save_path, filename)]
         vis_det_results(oil_level_preds, save_names, line_thickness=1)
 
-    # 未检测到油液时，直接返回
+    # 未检测到油液，直接返回
     if len(oil_level_preds["preds"]) == 0:
         oil_level_result["output_info"]["norm_bbox"] = []
         oil_level_result["output_info"]["bbox"] = []
@@ -212,18 +272,11 @@ def recog_one_img_oil_level_reading(source_ori,
     det_post_time = det_post_t1 - det_post_t0
 
     ##########################################
-    # 根据油液检测结果获取当前剩余油液
+    # 根据油液检测结果获取当前油液状态
     ##########################################
     calc_t0 = time.time()
-    if len(bboxes) != 0:
-        h_tube = int(bboxes[0][4]) - int(bboxes[0][2])
-        h_level = int(bboxes[1][4]) - int(bboxes[1][2])
-        level = h_level / (h_tube + 1e-8) * 100
-        level = (level // 10) * 10 + (10 if level % 10 >= 5 else 0)
-        level = min(level, 100)
-    else:
-        level = -1
-    oil_level_result["output_info"]["level"] = [str(level)]
+    state = get_oil_level_state(bboxes, thresh_high=2, thresh_low=2)
+    oil_level_result["output_info"]["state"] = [str(state)]
     clac_t1 = time.time()
     calc_time = clac_t1 - calc_t0
 
@@ -233,15 +286,14 @@ def recog_one_img_oil_level_reading(source_ori,
     if show_temp:
         recog_save_root = "%s/result" % save_path
         os.makedirs(recog_save_root, exist_ok=True)
-        colors = [(0, 0, 255), (0, 255, 0)]
+        colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (255, 255, 0)]
         img0_ = img0.copy()
         for i in range(len(bboxes)):
             cls_id, x1, y1, x2, y2, _ = bboxes[i]
             cls_id, x1, y1, x2, y2 = [int(x) for x in [cls_id, x1, y1, x2, y2]]
             img0_ = cv2.rectangle(img0_, (x1, y1), (x2, y2), colors[int(cls_id)], 3)
-            if cls_id == 0:
-                img0_ = cv2.putText(img0_, str(level), (x1, y1 - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 3)
+        img0_ = cv2.putText(img0_, str(state), (100, 300),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 10, (0, 0, 255), 10)
         img_save_path = "%s/%s" % (recog_save_root, os.path.basename(source_ori))
         cv2.imwrite(img_save_path, img0_)
     return oil_level_result
@@ -250,25 +302,27 @@ def recog_one_img_oil_level_reading(source_ori,
 def save_oil_level_result(oil_level_result, save_path):
     img_path = oil_level_result["input_info"]["img_path"]
     img = cv2.imread(img_path)
-    bboxes = oil_level_result["output_info"]["bbox"]
-    levels = oil_level_result["output_info"]["level"]
-    # 每个图片的油管位置
-    for i in range(len(bboxes)):
-        cls_id, x1, y1, x2, y2, conf = bboxes[i]
-        cls_id, x1, y1, x2, y2 = [int(x) for x in [cls_id, x1, y1, x2, y2]]
-        if cls_id == 0:
-            img = cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
-            level = levels[0]
-            img = cv2.putText(img, str(level), (x1 - 10, y1 - 30),
-                              cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 3)
+    states = oil_level_result["output_info"]["state"]
+
+    state_desc = oil_level_result["output_info"]["state_desc"]
+    # 在图像左上角表明类别注释
+    font_path = "simsun.ttc"
+    font_size = 100
+    font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
+    img_pil = Image.fromarray(img)
+    draw = ImageDraw.Draw(img_pil)
+    line = "%s: %s" % (states[0], state_desc[states[0]])
+    draw.text((10, 10), line, (0, 0, 255), font=font, stroke_width=2)
+    img = np.array(img_pil)
+
     os.makedirs(save_path, exist_ok=True)
     base_name = os.path.basename(img_path)
     img_save_path = "%s/%s" % (save_path, base_name)
     cv2.imwrite(img_save_path, img)
 
 
-def recog_img_oil_level_reading(abso_img_paths, save_path,
-                                device="cuda", show_temp=False):
+def recog_img_oil_level(abso_img_paths, save_path,
+                        device="cuda", show_temp=False):
     """
     :param abso_img_paths: 输入图片的绝对路径，字符串列表
     :param save_path: 结果保存路径
@@ -276,7 +330,7 @@ def recog_img_oil_level_reading(abso_img_paths, save_path,
     :return:
     results: 列表，每个元素表示对应图片的识别结果，结果格式见recog_one_img_oil_level方法的返回结果
     """
-    ckpt_oil_level_det = "./yolov5/runs/train/oil_level/weights/best.pt"
+    ckpt_oil_level_det = "./yolov5/runs/train/oil_level_640_640_300_16/weights/best.pt"
     # init oil_level detector
     model_det_oil_level = init_model_detector(ckpt_oil_level_det, device)
 
@@ -286,7 +340,7 @@ def recog_img_oil_level_reading(abso_img_paths, save_path,
         if not os.path.exists(source_ori):
             print("%s not exist" % source_ori)
             continue
-        oil_level_result = recog_one_img_oil_level_reading(source_ori, model_det_oil_level,
+        oil_level_result = recog_one_img_oil_level(source_ori, model_det_oil_level,
                                                    "%s/alg_out" % save_path_, show_temp, device)
         results.append(oil_level_result)
         if show_temp:
@@ -297,20 +351,17 @@ def recog_img_oil_level_reading(abso_img_paths, save_path,
 
 def main():
     img_root = "./test_imgs/oil_level"
-    img_root = "F:/dataset/bolt_piezometer/oil_level/images/train_ori"
-    img_root = "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/oil_level/images/train_ori"
-    abso_img_paths = sorted(glob("%s/*.JPG" % img_root))
+    img_root = "F:/dataset/bolt_piezometer/oil_level/images_ori"
+    # img_root = "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/oil_level/images_ori"
+    abso_img_paths = sorted(glob("%s/*" % img_root))
+    # abso_img_paths = [
+    #     "F:/dataset/bolt_piezometer/oil_level/images_ori/IMG_20230711_095205.jpg"
+    # ]
     save_path = "tmp_results/oil_level"
     device = "cuda"
     show_temp = True
-    # show_temp = False
-    # abso_img_paths = [
-    #     "F:/dataset/bolt_piezometer/oil_level/images/train_ori/DJI_20230424101915_0138_V.JPG",
-    #     "F:/dataset/bolt_piezometer/oil_level/images/train_ori/DJI_20230424103859_0038_V.JPG",
-    #     "F:/dataset/bolt_piezometer/oil_level/images/train_ori/DJI_20230424104301_0061_V.JPG"
-    # ]
-    results = recog_img_oil_level_reading(abso_img_paths, save_path,
-                                          device, show_temp)
+    results = recog_img_oil_level(abso_img_paths, save_path,
+                                  device, show_temp)
     print(results)
 
 
