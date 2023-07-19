@@ -157,7 +157,7 @@ if __name__ == '__main__':
     cd 至代码根目录
     export FLASK_APP=web_interface
     export FLASK_ENV=development
-    flask run --host 0.0.0.0
+    flask run --host 0.0.0.0 --port 9999
     2. 客户端接口调用
     螺丝松动api调用: curl -X POST http://10.10.3.99:9999/api/bolt_loosen -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/bolt1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/bolt1\", \"thresh_angle\": 5, \"thresh_dist\": 5, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
     表计读数api调用: curl -X POST http://10.10.3.99:9999/api/piezometer_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/piezometer1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/piezometer1\", \"kernel_size\": 1, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"

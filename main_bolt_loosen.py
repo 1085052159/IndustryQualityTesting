@@ -241,7 +241,8 @@ def recog_one_img_bolt_state(source_ori,
     
     img0, filename = read_img(source_ori)
     ori_h, ori_w, _ = img0.shape
-    imgsz = 320
+    # imgsz = 640
+    imgsz = 416
     img = resize_img(img0, ratio=(imgsz / ori_h))
     
     bolt_loosen_result["input_info"]["img_path"] = source_ori
@@ -352,9 +353,9 @@ def save_bolt_state_result(bolt_loosen_result, save_path):
     draw = ImageDraw.Draw(img_pil)
     for key, value in state_desc.items():
         line = "%s: %s" % (key, value)
-        draw.text((10, 10 + int(key) * font_size), line, (0, 0, 255), font=font, stroke_width=2)
+        draw.text((30, 30 + int(key) * font_size), line, (0, 0, 255), font=font, stroke_width=2)
     img = np.array(img_pil)
-
+    
     bboxes = bolt_loosen_result["output_info"]["bbox"]
     states = bolt_loosen_result["output_info"]["state"]
     # 每个图片的螺丝位置
@@ -364,10 +365,10 @@ def save_bolt_state_result(bolt_loosen_result, save_path):
         x1, y1, x2, y2 = [int(x) for x in [x1, y1, x2, y2]]
         
         # print(img_path, x1, y1, x2, y2)
-        img = cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 3)
+        img = cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 6)
         state = states[i]
-        img = cv2.putText(img, str(state), (x1 - 10, y1 - 30),
-                          cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 3)
+        img = cv2.putText(img, str(state), (x1 - 10, y1 - 40),
+                          cv2.FONT_HERSHEY_SIMPLEX, 6, (0, 0, 255), 6)
     os.makedirs(save_path, exist_ok=True)
     base_name = os.path.basename(img_path)
     img_save_path = "%s/%s" % (save_path, base_name)
@@ -385,15 +386,23 @@ def recog_img_bolt_state(abso_img_paths, save_path,
     :return:
     results: 列表，每个元素表示对应图片的识别结果，结果格式见recog_one_img_bolt_state方法的返回结果
     """
-    ckpt_bolt_det = "./yolov5/runs/train/bolt/weights/best.pt"
+    # ckpt_bolt_det = "./yolov5/runs/train/bolt_416_416_150_16/weights/best.pt"
+    ckpt_bolt_det = "./yolov5/runs/train/bolt_416_416_300_32/weights/best.pt"
+    # ckpt_bolt_det = "./yolov5/runs/train/bolt/weights/best.pt"
     # init bolt detector
     model_det_bolt = init_model_detector(ckpt_bolt_det, device)
     
     # init bolt marker segmentator
     # config_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b0.256x256.bolt_line.6k/segformer.b0.256x256.bolt_line.6k.py"
     # ckpt_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b0.256x256.bolt_line.6k/iter_5500.pth"
-    config_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.6k/segformer.b1.256x256.bolt_line.6k.py"
-    ckpt_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.6k/iter_5000.pth"
+    # config_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.6k/segformer.b1.256x256.bolt_line.6k.py"
+    # ckpt_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.6k/iter_5000.pth"
+    # config_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.80k/segformer.b1.256x256.bolt_line.80k.py"
+    # ckpt_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.80k/iter_52000.pth"
+    # config_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b0.256x256.bolt_line.30k/segformer.b0.256x256.bolt_line.30k.py"
+    # ckpt_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b0.256x256.bolt_line.30k/iter_26000.pth"
+    config_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.30k/segformer.b1.256x256.bolt_line.30k.py"
+    ckpt_bolt_marker_seg = "./SegFormer/work_dirs/segformer.b1.256x256.bolt_line.30k/iter_14000.pth"
     model_seg_bolt_marker = init_model_segmentator(config_bolt_marker_seg, ckpt_bolt_marker_seg, device)
     
     results = []
@@ -414,9 +423,14 @@ def recog_img_bolt_state(abso_img_paths, save_path,
 
 
 def main():
-    img_root = "./test_imgs/bolt"
+    img_root = "./test_imgs/bolt2"
     abso_img_paths = sorted(glob("%s/*" % img_root))
-    save_path = "tmp_results/bolt_loosen"
+    # abso_img_paths = [
+    #     "test_imgs/bolt2/02703.jpg",
+    #     "test_imgs/bolt2/DJI_20230613103356_0028_V.jpg",
+    #     "test_imgs/bolt2/DJI_20230613104718_0143_V.JPG"
+    # ]
+    save_path = "tmp_results/bolt_loosen2"
     thresh_angle = 5
     thresh_dist = 5
     device = "cuda"
