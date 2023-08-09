@@ -2,7 +2,7 @@ _base_ = [
     '../../_base_/models/segformer.py',
     '../../_base_/datasets/bolt_line.py',
     '../../_base_/default_runtime.py',
-    '../../_base_/schedules/schedule_6k_adamw.py'
+    '../../_base_/schedules/schedule_30k_adamw.py'
 ]
 
 # model settings
@@ -45,4 +45,4 @@ lr_config = dict(_delete_=True, policy='poly',
                  power=1.0, min_lr=0.0, by_epoch=False)
 
 data = dict(samples_per_gpu=32)
-evaluation = dict(interval=500, metric='mIoU')
+evaluation = dict(interval=2000, metric='mIoU')

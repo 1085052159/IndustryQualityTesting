@@ -2,7 +2,7 @@ _base_ = [
     '../../_base_/models/segformer.py',
     '../../_base_/datasets/bolt_line.py',
     '../../_base_/default_runtime.py',
-    '../../_base_/schedules/schedule_6k_adamw.py'
+    '../../_base_/schedules/schedule_30k_adamw.py'
 ]
 
 # model settings
@@ -10,13 +10,13 @@ norm_cfg = dict(type='SyncBN', requires_grad=True)
 find_unused_parameters = True
 model = dict(
     type='EncoderDecoder',
-    pretrained='pretrained/mit_b0.pth',
+    pretrained='pretrained/mit_b1.pth',
     backbone=dict(
-        type='mit_b0',
+        type='mit_b1',
         style='pytorch'),
     decode_head=dict(
         type='SegFormerHead',
-        in_channels=[32, 64, 160, 256],
+        in_channels=[64, 128, 320, 512],
         in_index=[0, 1, 2, 3],
         feature_strides=[4, 8, 16, 32],
         channels=128,
@@ -44,5 +44,5 @@ lr_config = dict(_delete_=True, policy='poly',
                  warmup_ratio=1e-6,
                  power=1.0, min_lr=0.0, by_epoch=False)
 
-data = dict(samples_per_gpu=32)
-evaluation = dict(interval=500, metric='mIoU')
+data = dict(samples_per_gpu=16)
+evaluation = dict(interval=2000, metric='mIoU')

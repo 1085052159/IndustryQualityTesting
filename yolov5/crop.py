@@ -30,7 +30,7 @@ def norm2image_level(norm_bbox, height, width):
 
 def crop_one_img(pred_txt_name, img_root, crop_img_root, dst_h=320):
     base_name = os.path.basename(pred_txt_name).split(".")[0]
-    img_name = "%s/%s.JPG" % (img_root, base_name)
+    img_name = "%s/%s.jpg" % (img_root, base_name)
     img = cv2.imread(img_name)
     height, width, _ = img.shape
 
@@ -48,7 +48,7 @@ def crop_one_img(pred_txt_name, img_root, crop_img_root, dst_h=320):
         if dst_w < 200:
             continue
         crop_img = cv2.resize(crop_img, (dst_w, int(dst_h)))
-        crop_img_name = "%s/%s_%s_%s.JPG" % (crop_img_root, int(cls_id), base_name, str(idx).zfill(3))
+        crop_img_name = "%s/%s_%s_%s.jpg" % (crop_img_root, int(cls_id), base_name, str(idx).zfill(3))
         cv2.imwrite(crop_img_name, crop_img)
 
 
@@ -67,7 +67,7 @@ def crop_batch_img(pred_txt_root, img_root, crop_img_root, new_height=320):
 
 
 new_height = 320
-pred_txt_root = "runs/detect/bolt/labels"
-img_root = "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt/images/train_ori"
-crop_img_root = "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single/images/train"
+pred_txt_root = "runs/detect/bolt_416/labels"
+img_root = "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt1/images_ori"
+crop_img_root = "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single1/images"
 crop_batch_img(pred_txt_root, img_root, crop_img_root, new_height)

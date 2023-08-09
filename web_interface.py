@@ -1,7 +1,9 @@
+import gc
 import sys
 import os
+from multiprocessing import Pool
 
-from main_oil_level import recog_img_oil_level
+import torch
 
 sys.path.append(os.getcwd() + "/yolov5")
 sys.path.append(os.getcwd() + "/SegFormer")
@@ -11,6 +13,7 @@ from flask import Flask, request, jsonify, make_response
 
 from main_bolt_loosen import recog_img_bolt_state
 from main_piezometer_reading import recog_img_reading
+from main_oil_level import recog_img_oil_level
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -58,12 +61,15 @@ def bolt_loosen():
         res_dict["results"] = []
     else:
         abso_img_paths = sorted(glob("%s/*" % img_root))
-        results = recog_img_bolt_state(abso_img_paths, save_path,
-                                       thresh_angle, thresh_dist,
-                                       device, show_temp)
+        pool = Pool(1)
+        results = pool.apply(recog_img_bolt_state, args=(abso_img_paths, save_path, thresh_angle,
+                                                         thresh_dist, device, show_temp))
+        pool.close()
+        pool.join()
         res_dict["results"] = results
     response = make_response(jsonify(res_dict))
     response.headers["Content-Type"] = "application/json;charset=UTF-8"
+    gc.collect()
     return response
 
 
@@ -103,7 +109,11 @@ def piezometer_reading():
         res_dict["results"] = []
     else:
         abso_img_paths = sorted(glob("%s/*" % img_root))
-        results = recog_img_reading(abso_img_paths, save_path, kernel_size, device, show_temp)
+        pool = Pool(1)
+        results = pool.apply(recog_img_reading, args=(abso_img_paths, save_path, kernel_size,
+                                                      device, show_temp))
+        pool.close()
+        pool.join()
         res_dict["results"] = results
     
     response = make_response(jsonify(res_dict))
@@ -135,20 +145,22 @@ def oil_level_reading():
     else:
         error_warn_info += "警告: 缺少参数show_temp，使用默认值，False. "
         show_temp = False
-
+    
     res_dict = {}
     res_dict["error_warn_info"] = error_warn_info
     if "错误" in error_warn_info:
         res_dict["results"] = []
     else:
         abso_img_paths = sorted(glob("%s/*" % img_root))
-        results = recog_img_oil_level(abso_img_paths, save_path, device, show_temp)
+        pool = Pool(1)
+        results = pool.apply(recog_img_oil_level, args=(abso_img_paths, save_path, device, show_temp))
+        pool.close()
+        pool.join()
         res_dict["results"] = results
-
+    
     response = make_response(jsonify(res_dict))
     response.headers["Content-Type"] = "application/json;charset=UTF-8"
     return response
-
 
 
 if __name__ == '__main__':
@@ -164,4 +176,5 @@ if __name__ == '__main__':
     油液读数api调用: curl -X POST http://10.10.3.99:9999/api/oil_level_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/oil_level1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/oil_level1\", \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
     0: False, 1: True
     """
-    app.run(debug=True, host="0.0.0.0", post=5000)
+    torch.multiprocessing.set_start_method('spawn')
+    app.run(host="0.0.0.0", port=9999, debug=True)

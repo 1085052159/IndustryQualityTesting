@@ -26,8 +26,13 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from yolov5.detect_infer import init_model_detector, run_detector, read_imgs, vis_det_results
+from yolov5.detect_infer import init_model_detector, run_detector, vis_det_results
 from SegFormer.seg_infer import init_model_segmentator, run_segmentator, vis_seg_results
+from flask import Flask, request, make_response, jsonify
+
+app = Flask(__name__)
+app.config.from_object(__name__)
+app.config["JSON_AS_ASCII"] = False
 
 MARK_LABEL_MAP = {
     "0": 0,
@@ -707,7 +712,8 @@ def save_reading_result(reading_result, save_path):
     #     f.write(json_str)
 
 
-def recog_img_reading(abso_img_paths, save_path, kernel_size=1, device="cuda", show_temp=False):
+def recog_img_reading1(model_det_piezometer, model_det_panel_mark, model_seg_panel_pointer,
+                       abso_img_paths, save_path, kernel_size=1, device="cuda", show_temp=False):
     """
     :param abso_img_paths: 输入图片的绝对路径，字符串列表
     :param save_path: 结果保存路径
@@ -717,14 +723,6 @@ def recog_img_reading(abso_img_paths, save_path, kernel_size=1, device="cuda", s
     :return:
     results: 列表，每个元素表示对应图片的识别结果，结果格式见recog_one_img_reading方法的返回结果
     """
-
-    ckpt_det_piezometer = "./ckpts/piezometer_det.pt"
-    ckpt_det_panel_mark = "./ckpts/piezometer_panel_mark_det.pt"
-    config_seg_pointer = "./ckpts/piezometer_pointer_seg.py"
-    ckpt_seg_pointer = "./ckpts/piezometer_pointer_seg.pth"
-    model_det_piezometer = init_model_detector(ckpt_det_piezometer, device)
-    model_det_panel_mark = init_model_detector(ckpt_det_panel_mark, device)
-    model_seg_panel_pointer = init_model_segmentator(config_seg_pointer, ckpt_seg_pointer, device)
     
     results = []
     for source_ori in tqdm(abso_img_paths):
@@ -736,7 +734,7 @@ def recog_img_reading(abso_img_paths, save_path, kernel_size=1, device="cuda", s
                                                model_det_piezometer,
                                                model_det_panel_mark,
                                                model_seg_panel_pointer, kernel_size,
-                                               "%s/alg_out" % save_path_, show_temp)
+                                               "%s/alg_out" % save_path_, show_temp, device)
         results.append(reading_result)
         if show_temp:
             # 保存识别结果
@@ -744,16 +742,66 @@ def recog_img_reading(abso_img_paths, save_path, kernel_size=1, device="cuda", s
     return results
 
 
-def main():
-    img_root = "./test_imgs/piezometer"
-    abso_img_paths = sorted(glob("%s/*" % img_root))
-    save_path = "tmp_results/piezometer_reading"
-    kernel_size = 1
-    device = "cuda"
-    show_temp = True
-    # show_temp = False
-    recog_img_reading(abso_img_paths, save_path, kernel_size, device, show_temp)
+@app.route("/api/piezometer_reading", methods=["POST"])
+def piezometer_reading():
+    data = request.json
+    keys = list(data.keys())
+    error_warn_info = ""
+    if "img_root" in keys:
+        img_root = data["img_root"]
+    else:
+        error_warn_info += "错误: 缺少参数img_root. "
+    if "save_path" in keys:
+        save_path = data["save_path"]
+    else:
+        error_warn_info += "警告: 缺少参数save_path，使用默认值./tmp_results/piezometer. "
+        save_path = "./tmp_results/piezometer"
+    if "kernel_size" in keys:
+        kernel_size = float(data["kernel_size"])
+    else:
+        error_warn_info += "警告: kernel_size，使用默认值1. "
+        kernel_size = 1
+    if "device" in keys:
+        device = data["device"]
+    else:
+        error_warn_info += "警告: 缺少参数device，使用默认值cuda. "
+        device = "cuda"
+    if "show_temp" in keys:
+        show_temp = bool(data["show_temp"])
+    else:
+        error_warn_info += "警告: 缺少参数show_temp，使用默认值，False. "
+        show_temp = False
+    
+    res_dict = {}
+    res_dict["error_warn_info"] = error_warn_info
+    if "错误" in error_warn_info:
+        res_dict["results"] = []
+    else:
+        abso_img_paths = sorted(glob("%s/*" % img_root))
+        results = recog_img_reading1(model_det_piezometer, model_det_panel_mark, model_seg_panel_pointer,
+                                     abso_img_paths, save_path, kernel_size, device, show_temp)
+        res_dict["results"] = results
+    
+    response = make_response(jsonify(res_dict))
+    response.headers["Content-Type"] = "application/json;charset=UTF-8"
+    return response
 
 
 if __name__ == '__main__':
-    main()
+    """
+    1. 启动服务器
+    cd 至代码根目录
+    python main_piezometer_reading_web.py
+    2. 客户端接口调用
+    表计读数api调用: curl -X POST http://10.10.3.99:9997/api/piezometer_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/piezometer1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/piezometer1\", \"kernel_size\": 1, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
+    0: False, 1: True
+    """
+    ckpt_det_piezometer = "./ckpts/piezometer_det.pt"
+    ckpt_det_panel_mark = "./ckpts/piezometer_panel_mark_det.pt"
+    config_seg_pointer = "./ckpts/piezometer_pointer_seg.py"
+    ckpt_seg_pointer = "./ckpts/piezometer_pointer_seg.pth"
+    device = "cuda"
+    model_det_piezometer = init_model_detector(ckpt_det_piezometer, device)
+    model_det_panel_mark = init_model_detector(ckpt_det_panel_mark, device)
+    model_seg_panel_pointer = init_model_segmentator(config_seg_pointer, ckpt_seg_pointer, device)
+    app.run(host="0.0.0.0", port=9997, debug=True)

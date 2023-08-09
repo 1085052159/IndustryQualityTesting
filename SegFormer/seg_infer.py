@@ -30,6 +30,7 @@ def run_segmentator(model, imgs):
         mask[np.where(mask == 1)] = 255
         results["preds"].append(mask)
     t1 = time.time()
+    # print("seg time: ", t1 - t0)
     return results
 
 
@@ -48,8 +49,12 @@ if __name__ == '__main__':
     # config = "local_configs/segformer/B0/segformer.b0.256x256.pointer.160k.py"
     # ckpt = "work_dirs/segformer.b0.256x256.pointer.160k/iter_4000.pth"
 
-    config = "local_configs/segformer/B0/segformer.b0.256x256.bolt_line.6k.py"
-    ckpt = "work_dirs/segformer.b0.256x256.bolt_line.6k/iter_5500.pth"
+    # config = "local_configs/segformer/B0/segformer.b0.256x256.bolt_line.6k.py"
+    # ckpt = "work_dirs/segformer.b0.256x256.bolt_line.6k/iter_5500.pth"
+    config = "local_configs/segformer/B1/segformer.b1.256x256.bolt_line.6k.py"
+    ckpt = "work_dirs/segformer.b1.256x256.bolt_line.6k/iter_5000.pth"
+    config = "./work_dirs/segformer.b1.256x256.bolt_line.30k/segformer.b1.256x256.bolt_line.30k.py"
+    ckpt = "./work_dirs/segformer.b1.256x256.bolt_line.30k/iter_14000.pth"
     device = "cuda"
     model = init_model_segmentator(config, ckpt, device)
     img_name = [
@@ -57,6 +62,13 @@ if __name__ == '__main__':
         "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/piezometer_panel_multi_cls/images/train/0_DJI_20230424102125_0157_V_000.JPG"
     ]
     img_name = [
-        "bolt_test_00.JPG"
+        "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single/images/train/0_DJI_20230613103023_0003_V_002.JPG",
+        "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single/images/train/0_DJI_20230613103023_0003_V_002.JPG",
+        "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single/images/train/0_DJI_20230613103023_0003_V_002.JPG"
     ]
-    run_segmentator(model, img_name)
+    from glob import glob
+    img_name = glob("/media/ubuntu/win_software/PycharmWorkspaces/IndustryQualityTesting/yolov5/runs/detect/bolt_640_0.25_0.2/bolt/911_2/*")
+    
+    seg_results = run_segmentator(model, img_name)
+    save_img_names = [name.replace(".jpg", ".png") for name in img_name]
+    vis_seg_results(seg_results, save_img_names)

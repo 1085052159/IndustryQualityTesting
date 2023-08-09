@@ -196,12 +196,32 @@ def run_detector(model,  # model.pt path(s)
 
 def main():
     device = "cuda"
-    ckpt_det = "./runs/train/piezometer/weights/best.pt"
+    ckpt_det = "./runs/train/oil_level_640_640_300_16/weights/best.pt"
     save_path = "tmp_results_debug"
+
+    ckpt_det = "./runs/train/bolt_416_416_300_32/weights/best.pt"
+    save_path = "tmp_results_bolt"
     img_names = [
         "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/piezometer/images/train/DJI_20230525110017_0077_V.JPG",
         "/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/piezometer/images/train/DJI_20230525105404_0038_V.JPG"
     ]
+    img_names = [
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_093940.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_094059.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_094552.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_095124.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_100233.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_101816_1.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_102935.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_103343.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_103341.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_104407.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/IMG_20230711_104415_1.png",
+        "F:/dataset/bolt_piezometer/oil_level/images/demo.png"
+    ]
+
+    img_names = glob("E:/Downloads/test_imgs/*")
+    img_names = [x.replace("\\", "/") for x in img_names]
 
     # ckpt_det = "./runs/train/bolt/weights/best.pt"
     # save_path = "tmp_results_debug1"

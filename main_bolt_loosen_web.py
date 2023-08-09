@@ -9,6 +9,8 @@
 import sys
 import os
 
+from flask import Flask, request, make_response, jsonify
+
 sys.path.append(os.getcwd() + "/yolov5")
 sys.path.append(os.getcwd() + "/SegFormer")
 import math
@@ -23,6 +25,10 @@ from PIL import ImageFont, ImageDraw, Image
 
 from yolov5.detect_infer import init_model_detector, run_detector, vis_det_results
 from SegFormer.seg_infer import init_model_segmentator, run_segmentator, vis_seg_results
+
+app = Flask(__name__)
+app.config.from_object(__name__)
+app.config["JSON_AS_ASCII"] = False
 
 
 def read_img(img_name):
@@ -382,9 +388,10 @@ def save_bolt_state_result(bolt_loosen_result, save_path):
     cv2.imwrite(img_save_path, img)
 
 
-def recog_img_bolt_state(abso_img_paths, save_path,
-                         thresh_angle=5, thresh_dist=5,
-                         device="cuda", show_temp=False):
+def recog_img_bolt_state1(model_det_bolt, model_seg_bolt_marker,
+                          abso_img_paths, save_path,
+                          thresh_angle=5, thresh_dist=5,
+                          device="cuda", show_temp=False):
     """
     :param abso_img_paths: 输入图片的绝对路径，字符串列表
     :param save_path: 结果保存路径
@@ -393,15 +400,6 @@ def recog_img_bolt_state(abso_img_paths, save_path,
     :return:
     results: 列表，每个元素表示对应图片的识别结果，结果格式见recog_one_img_bolt_state方法的返回结果
     """
-    ckpt_bolt_det = "./ckpts/bolt_det.pt"
-    # init bolt detector
-    model_det_bolt = init_model_detector(ckpt_bolt_det, device)
-    
-    # init bolt marker segmentator
-    config_bolt_marker_seg = "./ckpts/bolt_line_seg_config.py"
-    ckpt_bolt_marker_seg = "./ckpts/bolt_line_seg.pth"
-    model_seg_bolt_marker = init_model_segmentator(config_bolt_marker_seg, ckpt_bolt_marker_seg, device)
-    
     results = []
     for source_ori in tqdm(abso_img_paths):
         save_path_ = "%s/%s" % (save_path, os.path.basename(source_ori).split(".")[0])
@@ -419,22 +417,72 @@ def recog_img_bolt_state(abso_img_paths, save_path,
     return results
 
 
-def main():
-    img_root = "./test_imgs/bolt3"
-    # img_root = "./vid_frames1/DJI_20230726233126_0001_V"
-    abso_img_paths = sorted(glob("%s/*" % img_root))
-    save_path = "tmp_results/bolt_loosen3"
-    # save_path = "tmp_results/DJI_20230726233126_0001_V"
-    thresh_angle = 15
-    thresh_dist = 5
-    device = "cuda"
-    show_temp = True
-    # show_temp = False
-    results = recog_img_bolt_state(abso_img_paths, save_path,
-                                   thresh_angle, thresh_dist,
-                                   device, show_temp)
-    print(results)
+@app.route("/api/bolt_loosen", methods=["POST"])
+def bolt_loosen():
+    data = request.json
+    keys = list(data.keys())
+    error_warn_info = ""
+    if "img_root" in keys:
+        img_root = data["img_root"]
+    else:
+        error_warn_info += "错误: 缺少参数img_root. "
+    if "save_path" in keys:
+        save_path = data["save_path"]
+    else:
+        error_warn_info += "警告: 缺少参数save_path，使用默认值./tmp_results/bolt. "
+        save_path = "./tmp_results/bolt"
+    if "thresh_angle" in keys:
+        thresh_angle = float(data["thresh_angle"])
+    else:
+        error_warn_info += "警告: 缺少参数thresh_angle，使用默认值5. "
+        thresh_angle = 5
+    if "thresh_dist" in keys:
+        thresh_dist = float(data["thresh_dist"])
+    else:
+        error_warn_info += "警告: 缺少参数thresh_dist，使用默认值5. "
+        thresh_dist = 5
+    if "device" in keys:
+        device = data["device"]
+    else:
+        error_warn_info += "警告: 缺少参数device，使用默认值cuda. "
+        device = "cuda"
+    if "show_temp" in keys:
+        show_temp = bool(data["show_temp"])
+    else:
+        error_warn_info += "警告: 缺少参数show_temp，使用默认值，False. "
+        show_temp = False
+    
+    res_dict = {}
+    res_dict["error_warn_info"] = error_warn_info
+    if "错误" in error_warn_info:
+        res_dict["results"] = []
+    else:
+        abso_img_paths = sorted(glob("%s/*" % img_root))
+        
+        results = recog_img_bolt_state1(model_det_bolt, model_seg_bolt_marker, abso_img_paths, save_path, thresh_angle,
+                                        thresh_dist, device, show_temp)
+        res_dict["results"] = results
+        response = make_response(jsonify(res_dict))
+        response.headers["Content-Type"] = "application/json;charset=UTF-8"
+    return response
 
 
 if __name__ == '__main__':
-    main()
+    """
+    1. 启动服务器
+    cd 至代码根目录
+    python main_bolt_loosen_web.py
+    2. 客户端接口调用
+    螺丝松动api调用: curl -X POST http://10.10.3.99:9999/api/bolt_loosen -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/bolt1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/bolt1\", \"thresh_angle\": 5, \"thresh_dist\": 5, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
+    0: False, 1: True
+    """
+    device = "cuda"
+    ckpt_bolt_det = "./ckpts/bolt_det.pt"
+    # init bolt detector
+    model_det_bolt = init_model_detector(ckpt_bolt_det, device)
+    
+    # init bolt marker segmentator
+    config_bolt_marker_seg = "./ckpts/bolt_line_seg_config.py"
+    ckpt_bolt_marker_seg = "./ckpts/bolt_line_seg.pth"
+    model_seg_bolt_marker = init_model_segmentator(config_bolt_marker_seg, ckpt_bolt_marker_seg, device)
+    app.run(host="0.0.0.0", port=9999, debug=True)

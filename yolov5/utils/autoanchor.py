@@ -105,8 +105,8 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
         with open(path) as f:
             data_dict = yaml.safe_load(f)  # model dict
         from utils.datasets import LoadImagesAndLabels
-        # dataset = LoadImagesAndLabels(data_dict['train'], augment=True, rect=True)
-        dataset = LoadImagesAndLabels(data_dict["path"] + "/" + data_dict['train'], augment=True, rect=True)
+        dataset = LoadImagesAndLabels(data_dict['train'], augment=True, rect=True)
+        # dataset = LoadImagesAndLabels(data_dict["path"] + "/" + data_dict['train'], augment=True, rect=True)
     else:
         dataset = path  # dataset
 
@@ -163,5 +163,5 @@ def kmean_anchors(path='./data/coco128.yaml', n=9, img_size=640, thr=4.0, gen=10
 
 
 if __name__ == '__main__':
-    dataset = "../data/oil_level.yaml"
-    kmean_anchors(dataset)
+    dataset = "../data/bolt.yaml"
+    kmean_anchors(dataset, n=9, img_size=640)

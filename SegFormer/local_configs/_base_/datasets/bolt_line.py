@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'BoltLineDataset'
-data_root = '/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single'
+data_root = '/media/ubuntu/dataset_nvme/dataset/bolt_piezometer/bolt_single_total'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (256, 256)
@@ -33,25 +33,25 @@ test_pipeline = [
 ]
 data = dict(
     samples_per_gpu=2,
-    workers_per_gpu=2,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         data_root=data_root,
         img_dir='images/train',
         ann_dir='masks/train',
-        img_suffix='.JPG',
+        img_suffix='.png',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
         data_root=data_root,
-        img_dir='images/train',
-        ann_dir='masks/train',
-        img_suffix='.JPG',
+        img_dir='images/val',
+        ann_dir='masks/val',
+        img_suffix='.png',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
         data_root=data_root,
-        img_dir='images/train',
-        ann_dir='masks/train',
-        img_suffix='.JPG',
+        img_dir='images/val',
+        ann_dir='masks/val',
+        img_suffix='.png',
         pipeline=test_pipeline))

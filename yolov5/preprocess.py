@@ -1,9 +1,12 @@
 import os
+import random
 from glob import glob
 import json
 
 import cv2
 from tqdm import tqdm
+
+random.seed(123456)
 
 
 def labelbee_json2txt(json_label_root):
@@ -35,6 +38,8 @@ def labelbee_json2txt(json_label_root):
     json_labels = glob("%s/*.json" % json_label_root)
     for label_path in tqdm(json_labels):
         label_path = label_path.replace("\\", "/")
+        if "classes" in label_path.lower():
+            continue
         label_txt_path = "%s.txt" % (label_path.split(".")[0].replace("/labels_json/", "/labels/"))
         label_txt_root = os.path.dirname(label_txt_path)
         os.makedirs(label_txt_root, exist_ok=True)
@@ -83,7 +88,7 @@ def labelme_json2txt(json_label_root):
 
 
 def verify(json_label_root):
-    label_json_path = glob("%s/*.json" % json_label_root)[0].replace("\\", "/")
+    label_json_path = glob("%s/*.json" % json_label_root)[10].replace("\\", "/")
     label_txt_path = "%s.txt" % (label_json_path.split(".")[0].replace("/labels_json/", "/labels/"))
     img_path = label_txt_path.replace("/labels/", "/images/").replace(".txt", ".png")
     img = cv2.imread(img_path)
@@ -123,11 +128,21 @@ def resize_imgs(img_root, img_save_root, new_height=320):
         cv2.imwrite(img_save_path, new_img)
 
 
-def gen_train_test_txt(img_root, save_root):
+def gen_train_test_txt(img_root, save_root, train_ratio=0.8):
     img_abso_paths = glob("%s/*" % (img_root))
     img_abso_paths = [x.replace("\\", "/") for x in img_abso_paths]
+    train = []
+    test = []
+    for path in img_abso_paths:
+        if random.random() <= train_ratio:
+            train.append(path)
+        else:
+            test.append(path)
+
     with open("%s/train.txt" % save_root, "w") as f:
-        f.write("\n".join(img_abso_paths))
+        f.write("\n".join(train))
+    with open("%s/test.txt" % save_root, "w") as f:
+        f.write("\n".join(test))
 
 
 def img2jpg_img(img_root):
@@ -152,17 +167,18 @@ LABEL_MAP = {
 # # json_label_root = "F:/dataset/bolt_piezometer/piezometer/labels_json/train"
 # # json_label_root = "F:/dataset/bolt_piezometer/piezometer_multi_cls/labels_json/train"
 # # json_label_root = "F:/dataset/bolt_piezometer/piezometer_panel/labels_json/train"
-dataset_name = "bolt1"
+dataset_name = "bolt_total"
 json_label_root = "F:/dataset/bolt_piezometer/hole/labels_json"
 json_label_root = "F:/dataset/bolt_piezometer/oil_level/labels_json"
 json_label_root = "F:/dataset/bolt_piezometer/%s/labels_json" % dataset_name
 # labelbee_json2txt(json_label_root)
 # labelme_json2txt(json_label_root)
-# verify(json_label_root)
 
 img_root = "F:/dataset/bolt_piezometer/%s/images_ori" % dataset_name
 img_save_root = "F:/dataset/bolt_piezometer/%s/images" % dataset_name
-# resize_imgs(img_root, img_save_root, new_height=416)
+# resize_imgs(img_root, img_save_root, new_height=640)
+# verify(json_label_root)
+
 
 img_root = "F:/dataset/bolt_piezometer/%s/images" % dataset_name
 save_root = "F:/dataset/bolt_piezometer/%s" % dataset_name
