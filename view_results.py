@@ -5,7 +5,7 @@ from glob import glob
 from tqdm import tqdm
 
 
-exp_name = "DJI_20230711104903_0005_V"
+exp_name = "oil_level"
 dst_path = "view/%s/right" % exp_name
 os.makedirs(dst_path, exist_ok=True)
 root_path = "tmp_results/%s" % exp_name
