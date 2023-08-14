@@ -214,8 +214,8 @@ def recog_one_img_oil_level(source_ori,
                 "1": "超过高位阈值",
                 "2": "低于低位阈值",
                 "3": "其它",
-                "4": "疑似高位"
-                "5": "疑似低位"
+                "4": "疑似超过高位阈值"
+                "5": "疑似低于低位阈值"
             }
         }
     }
@@ -225,7 +225,7 @@ def recog_one_img_oil_level(source_ori,
     oil_level_result["output_info"] = {}
     
     oil_level_result["output_info"]["state_desc"] = {}
-    state_list = ["正常", "超过高位阈值", "低于低位阈值", "其它", "疑似高位", "疑似低位"]
+    state_list = ["正常", "超过高位阈值", "低于低位阈值", "其它", "疑似超过高位阈值", "疑似低于低位阈值"]
     for i in range(len(state_list)):
         oil_level_result["output_info"]["state_desc"][str(i)] = state_list[i]
     
