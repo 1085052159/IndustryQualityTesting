@@ -25,6 +25,16 @@ from yolov5.detect_infer import init_model_detector, run_detector, vis_det_resul
 from SegFormer.seg_infer import init_model_segmentator, run_segmentator, vis_seg_results
 
 
+COLORS = [
+    (0, 255, 0),
+    (0, 0, 255),
+    (0, 0, 255),
+    (0, 0, 255),
+    (0, 255, 255),
+    (0, 0, 255),
+]
+
+
 def read_img(img_name):
     img = cv2.imread(img_name)
     if img is None:
@@ -114,21 +124,27 @@ def bolt_post_process(preds, img, new_height=320):
 
 
 def get_one_mask_bboxes(mask):
+    if len(mask.shape) == 3:
+        mask_ori = mask[:, :, 0]
+    else:
+        mask_ori = mask.copy()
     contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     bboxes = []
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area < 20:
+        if area <= 20:
+            cv2.fillPoly(mask_ori, [contour], 0, 1)
             continue
-        x_coords = contour[:, 0, 0]
-        y_coords = contour[:, 0, 1]
-        x_min, x_max = min(x_coords), max(x_coords)
-        y_min, y_max = min(y_coords), max(y_coords)
-        w = x_max - x_min
-        h = y_max - y_min
-        cx = (x_min + x_max) / 2
-        cy = (y_min + y_max) / 2
-        bboxes.append([cx, cy, w, h])
+        rotate_rect = cv2.minAreaRect(contour)
+        bboxes.append(rotate_rect)
+    
+    # import pdb
+    # pdb.set_trace()
+    ys, xs = np.nonzero(mask_ori)
+    if len(ys) > 0 and len(xs) > 0:
+        contour = np.array([[xs[i], ys[i]] for i in range(len(ys))])
+        rotate_rect = cv2.minAreaRect(contour)
+        bboxes.append(rotate_rect)
     return bboxes
 
 
@@ -148,32 +164,28 @@ def get_loosen_state(bboxes, thresh_angle=5, thresh_dist=5):
         4: 无标记线，无法判断
         5: 标记线不规范，无法判断
     """
-    # import pdb
-    # pdb.set_trace()
     if len(bboxes) == 0:
-        return 4
-    elif len(bboxes) == 1:
-        return 0
+        state = 4
     elif len(bboxes) == 2:
-        dy1 = bboxes[0][1] - bboxes[1][1]
-        dx1 = bboxes[0][0] - bboxes[1][0]
-        angle = math.atan2(dx1, dy1)
-        angle = int(angle * 180 / math.pi)
-        angle = abs(angle)
-        if angle > thresh_angle:
-            return 1
-        center_dist_h = abs(bboxes[0][1] - bboxes[1][1])
-        gap_h = center_dist_h / ((bboxes[0][3] + bboxes[1][3]) / 2)
-        if gap_h > thresh_dist:
-            return 2
-        center_dist_w = abs(bboxes[0][0] - bboxes[1][0])
-        gap_w = center_dist_w / ((bboxes[0][2] + bboxes[1][2]) / 2)
-        # print("angle: %s; gap_w: %s; gap_h: %s" % (angle, gap_w, gap_h), end=" ")
-        if gap_w > thresh_dist:
-            return 3
-        return 0
+        state = 0
     else:
-        return 5
+        state = 0
+        out_rect = bboxes.pop()
+        out_angle = out_rect[-1]
+        out_angle = out_angle if out_angle <= 45 else 90 - out_angle
+        # print("out_rect: ", out_rect, out_angle)
+        for idx, rect in enumerate(bboxes):
+            angle = rect[-1]
+            angle = angle if angle <= 45 else 90 - angle
+            # print("rect: ", rect, angle)
+            if angle == out_angle:
+                if abs(out_rect[1][0] - rect[1][0]) <= 2 or abs(out_rect[1][1] - rect[1][1]) <= 2:
+                    state = 0
+                    break
+            else:
+                if not abs(out_angle - angle) <= thresh_angle:
+                    state = 1
+    return state
 
 
 def masks_post_process(results_bolt_marker, thresh_angle=5, thresh_dist=5):
@@ -334,7 +346,7 @@ def recog_one_img_bolt_state(source_ori,
             img = single_bolt_imgs[i]
             # import pdb
             # pdb.set_trace()
-            img = cv2.putText(img, str(states[i]), (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
+            img = cv2.putText(img, str(states[i]), (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, COLORS[states[i]], 1)
             img_save_path = "%s/%s" % (recog_save_root, os.path.basename(single_bolt_img_names[i]))
             cv2.imwrite(img_save_path, img)
     return bolt_loosen_result
@@ -360,7 +372,7 @@ def save_bolt_state_result(bolt_loosen_result, save_path):
     draw = ImageDraw.Draw(img_pil)
     for key, value in state_desc.items():
         line = "%s: %s" % (key, value)
-        draw.text((30, 30 + int(key) * font_size), line, (0, 0, 255), font=font, stroke_width=stroke_width)
+        draw.text((30, 30 + int(key) * font_size), line, COLORS[int(key)], font=font, stroke_width=stroke_width)
     img = np.array(img_pil)
     
     bboxes = bolt_loosen_result["output_info"]["bbox"]
@@ -371,11 +383,11 @@ def save_bolt_state_result(bolt_loosen_result, save_path):
         cls_id, x1, y1, x2, y2, conf = bboxes[i]
         x1, y1, x2, y2 = [int(x) for x in [x1, y1, x2, y2]]
         
-        # print(img_path, x1, y1, x2, y2)
-        img = cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 6)
         state = states[i]
+        # print(img_path, x1, y1, x2, y2)
+        img = cv2.rectangle(img, (x1, y1), (x2, y2), COLORS[state], 6)
         img = cv2.putText(img, str(state), (x1 - 10, y1 - font_scale * 10),
-                          cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), thickness)
+                          cv2.FONT_HERSHEY_SIMPLEX, font_scale, COLORS[state], thickness)
     os.makedirs(save_path, exist_ok=True)
     base_name = os.path.basename(img_path)
     img_save_path = "%s/%s" % (save_path, base_name)
@@ -399,7 +411,7 @@ def recog_img_bolt_state(abso_img_paths, save_path,
     
     # init bolt marker segmentator
     config_bolt_marker_seg = "./ckpts/bolt_line_seg_config.py"
-    ckpt_bolt_marker_seg = "./ckpts/bolt_line_seg.pth"
+    ckpt_bolt_marker_seg = "./ckpts/bolt_line_seg_backup.pth"
     model_seg_bolt_marker = init_model_segmentator(config_bolt_marker_seg, ckpt_bolt_marker_seg, device)
     
     results = []
@@ -420,13 +432,17 @@ def recog_img_bolt_state(abso_img_paths, save_path,
 
 
 def main():
-    img_root = "./test_imgs/bolt3"
+    img_root = "./test_imgs/bolt4"
     # img_root = "./vid_frames1/DJI_20230726233126_0001_V"
     abso_img_paths = sorted(glob("%s/*" % img_root))
-    save_path = "tmp_results/bolt_loosen3"
+    # abso_img_paths = [
+    #     "DJI_20230721095605_0018_V.JPG",
+    # ]
+    # abso_img_paths = ["%s/%s" % (img_root, x) for x in abso_img_paths]
+    save_path = "tmp_results/bolt_loosen4"
     # save_path = "tmp_results/DJI_20230726233126_0001_V"
-    thresh_angle = 15
-    thresh_dist = 5
+    thresh_angle = 8
+    thresh_dist = 8
     device = "cuda"
     show_temp = True
     # show_temp = False
