@@ -38,12 +38,12 @@ def bolt_loosen():
         thresh_angle = float(data["thresh_angle"])
     else:
         error_warn_info += "警告: 缺少参数thresh_angle，使用默认值5. "
-        thresh_angle = 5
+        thresh_angle = 8
     if "thresh_dist" in keys:
         thresh_dist = float(data["thresh_dist"])
     else:
         error_warn_info += "警告: 缺少参数thresh_dist，使用默认值5. "
-        thresh_dist = 5
+        thresh_dist = 8
     if "device" in keys:
         device = data["device"]
     else:
@@ -169,7 +169,7 @@ if __name__ == '__main__':
     cd 至代码根目录
     python web_interface.py
     2. 客户端接口调用
-    螺丝松动api调用: curl -X POST http://10.10.3.99:9999/api/bolt_loosen -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/bolt1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/bolt1\", \"thresh_angle\": 5, \"thresh_dist\": 5, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
+    螺丝松动api调用: curl -X POST http://10.10.3.99:9999/api/bolt_loosen -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/bolt1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/bolt1\", \"thresh_angle\": 8, \"thresh_dist\": 8, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
     表计读数api调用: curl -X POST http://10.10.3.99:9999/api/piezometer_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/piezometer1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/piezometer1\", \"kernel_size\": 1, \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
     油液读数api调用: curl -X POST http://10.10.3.99:9999/api/oil_level_reading -d "{\"img_root\": \"/home/dykj/work/IndustryQualityTesting/test_imgs/oil_level1\", \"save_path\": \"/home/dykj/work/IndustryQualityTesting/tmp_save/oil_level1\", \"device\": \"cuda\", \"show_temp\": 1}" -H "Content-Type:application/json"
     0: False, 1: True

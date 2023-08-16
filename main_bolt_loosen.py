@@ -355,18 +355,20 @@ def recog_one_img_bolt_state(source_ori,
 def save_bolt_state_result(bolt_loosen_result, save_path):
     img_path = bolt_loosen_result["input_info"]["img_path"]
     img = cv2.imread(img_path)
-    
+    h, w, _ = img.shape
     state_desc = bolt_loosen_result["output_info"]["state_desc"]
     # 在图像左上角表明类别注释
     font_path = "simsun.ttc"
-    font_size = 100
-    stroke_width = 2
-    font_scale = 6
-    thickness = 6
-    # font_size = 30
-    # stroke_width = 1
-    # font_scale = 2
-    # thickness = 3
+    if h > 1200:
+        font_size = 100
+        stroke_width = 2
+        font_scale = 6
+        thickness = 6
+    elif h > 800:
+        font_size = 30
+        stroke_width = 1
+        font_scale = 2
+        thickness = 3
     font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
     img_pil = Image.fromarray(img)
     draw = ImageDraw.Draw(img_pil)
@@ -433,14 +435,14 @@ def recog_img_bolt_state(abso_img_paths, save_path,
 
 def main():
     img_root = "./test_imgs/bolt4"
-    # img_root = "./vid_frames1/DJI_20230726233126_0001_V"
+    img_root = "./vid_frames1/DJI_20230728095908_0005_V"
     abso_img_paths = sorted(glob("%s/*" % img_root))
     # abso_img_paths = [
     #     "DJI_20230721095605_0018_V.JPG",
     # ]
     # abso_img_paths = ["%s/%s" % (img_root, x) for x in abso_img_paths]
     save_path = "tmp_results/bolt_loosen4"
-    # save_path = "tmp_results/DJI_20230726233126_0001_V"
+    save_path = "tmp_results/DJI_20230728095908_0005_V"
     thresh_angle = 8
     thresh_dist = 8
     device = "cuda"
